@@ -35,7 +35,7 @@ const Index = () => {
   const [cuttingDuration, setCuttingDuration] = useState(0);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [barbers, setBarbers] = useState<Barber[]>([
-    { id: '1', name: 'João', isActive: true }
+    { id: '1', name: 'João', isActive: true, completedClients: [] }
   ]);
   const { playNotification } = useNotificationSound();
 
@@ -127,7 +127,6 @@ const Index = () => {
       setClients(prev => prev.filter(c => c.id !== clientId));
       setCuttingDuration(0);
       
-      // Tocar notificação para o próximo cliente se houver
       const waitingClients = clients.filter(c => c.status === 'waiting' && c.id !== clientId);
       if (waitingClients.length > 0) {
         playNotification();
@@ -176,7 +175,8 @@ const Index = () => {
     const newBarber: Barber = {
       id: Date.now().toString(),
       name,
-      isActive: true
+      isActive: true,
+      completedClients: []
     };
     setBarbers(prev => [...prev, newBarber]);
   };
@@ -206,6 +206,70 @@ const Index = () => {
         description: `${barber.name} ${barber.isActive ? 'foi pausado' : 'voltou ao trabalho'}.`,
       });
     }
+  };
+
+  const assignClientToBarber = (barberId: string, clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    setBarbers(prev => prev.map(barber =>
+      barber.id === barberId
+        ? {
+            ...barber,
+            currentClient: {
+              id: client.id,
+              name: client.name,
+              service: client.service,
+              startTime: new Date(),
+              estimatedDuration: client.estimatedDuration
+            }
+          }
+        : barber
+    ));
+
+    setClients(prev => prev.filter(c => c.id !== clientId));
+    
+    playNotification();
+    toast({
+      title: "Cliente atribuído!",
+      description: `${client.name} foi atribuído ao barbeiro.`,
+    });
+  };
+
+  const completeBarberService = (barberId: string) => {
+    const barber = barbers.find(b => b.id === barberId);
+    if (!barber?.currentClient) return;
+
+    const completedClient: CompletedClient = {
+      id: barber.currentClient.id,
+      name: barber.currentClient.name,
+      service: barber.currentClient.service,
+      startTime: barber.currentClient.startTime,
+      endTime: new Date(),
+      estimatedDuration: barber.currentClient.estimatedDuration
+    };
+
+    setBarbers(prev => prev.map(b =>
+      b.id === barberId
+        ? {
+            ...b,
+            currentClient: undefined,
+            completedClients: [...b.completedClients, completedClient]
+          }
+        : b
+    ));
+
+    setCompletedClients(prev => [...prev, completedClient]);
+    
+    const waitingClientsCount = clients.filter(c => c.status === 'waiting').length;
+    if (waitingClientsCount > 0) {
+      playNotification();
+    }
+    
+    toast({
+      title: "Serviço concluído!",
+      description: `Atendimento de ${barber.currentClient.name} finalizado.`,
+    });
   };
 
   const waitingClients = clients.filter(c => c.status === 'waiting');
@@ -305,6 +369,19 @@ const Index = () => {
           />
         </div>
 
+        {/* Barber Management */}
+        <div className="mb-8">
+          <BarberManagement 
+            barbers={barbers}
+            waitingClients={waitingClients}
+            onAddBarber={addBarber}
+            onRemoveBarber={removeBarber}
+            onToggleBarberStatus={toggleBarberStatus}
+            onAssignClient={assignClientToBarber}
+            onCompleteService={completeBarberService}
+          />
+        </div>
+
         {/* Advanced Statistics */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
@@ -314,16 +391,6 @@ const Index = () => {
             completedClients={completedClients}
             waitingClients={waitingClients.length}
             currentHour={currentTime.getHours()}
-          />
-        </div>
-
-        {/* Barber Management */}
-        <div className="mb-8">
-          <BarberManagement 
-            barbers={barbers}
-            onAddBarber={addBarber}
-            onRemoveBarber={removeBarber}
-            onToggleBarberStatus={toggleBarberStatus}
           />
         </div>
 
