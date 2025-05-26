@@ -172,6 +172,42 @@ const Index = () => {
     }
   };
 
+  const addBarber = (name: string) => {
+    const newBarber: Barber = {
+      id: Date.now().toString(),
+      name,
+      isActive: true
+    };
+    setBarbers(prev => [...prev, newBarber]);
+  };
+
+  const removeBarber = (barberId: string) => {
+    const barber = barbers.find(b => b.id === barberId);
+    if (barber) {
+      setBarbers(prev => prev.filter(b => b.id !== barberId));
+      toast({
+        title: "Barbeiro removido",
+        description: `${barber.name} foi removido da equipe.`,
+      });
+    }
+  };
+
+  const toggleBarberStatus = (barberId: string) => {
+    setBarbers(prev => prev.map(barber =>
+      barber.id === barberId
+        ? { ...barber, isActive: !barber.isActive }
+        : barber
+    ));
+    
+    const barber = barbers.find(b => b.id === barberId);
+    if (barber) {
+      toast({
+        title: barber.isActive ? "Barbeiro pausado" : "Barbeiro ativado",
+        description: `${barber.name} ${barber.isActive ? 'foi pausado' : 'voltou ao trabalho'}.`,
+      });
+    }
+  };
+
   const waitingClients = clients.filter(c => c.status === 'waiting');
   const cuttingClient = clients.find(c => c.status === 'cutting');
 
