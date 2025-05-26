@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Scissors, Clock, Users, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,10 @@ import CompletedClientsHistory, { CompletedClient } from '@/components/Completed
 import PauseControl from '@/components/PauseControl';
 import { toast } from '@/hooks/use-toast';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import ServiceFilter from '@/components/ServiceFilter';
+import ExportReport from '@/components/ExportReport';
+import BarberManagement, { Barber } from '@/components/BarberManagement';
+import AdvancedStats from '@/components/AdvancedStats';
 
 export interface Client {
   id: string;
@@ -30,6 +33,10 @@ const Index = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [pauseStartTime, setPauseStartTime] = useState<Date | undefined>();
   const [cuttingDuration, setCuttingDuration] = useState(0);
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [barbers, setBarbers] = useState<Barber[]>([
+    { id: '1', name: 'João', isActive: true }
+  ]);
   const { playNotification } = useNotificationSound();
 
   useEffect(() => {
@@ -168,6 +175,18 @@ const Index = () => {
   const waitingClients = clients.filter(c => c.status === 'waiting');
   const cuttingClient = clients.find(c => c.status === 'cutting');
 
+  // Filter clients by selected service
+  const filteredWaitingClients = selectedService 
+    ? waitingClients.filter(c => c.service === selectedService)
+    : waitingClients;
+
+  // Get unique services and counts
+  const allServices = [...new Set(clients.map(c => c.service))];
+  const serviceCounts = waitingClients.reduce((acc, client) => {
+    acc[client.service] = (acc[client.service] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">
       <div className="container mx-auto px-4 py-8">
@@ -250,6 +269,40 @@ const Index = () => {
           />
         </div>
 
+        {/* Advanced Statistics */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
+            Estatísticas Avançadas
+          </h2>
+          <AdvancedStats 
+            completedClients={completedClients}
+            waitingClients={waitingClients.length}
+            currentHour={currentTime.getHours()}
+          />
+        </div>
+
+        {/* Barber Management */}
+        <div className="mb-8">
+          <BarberManagement 
+            barbers={barbers}
+            onAddBarber={addBarber}
+            onRemoveBarber={removeBarber}
+            onToggleBarberStatus={toggleBarberStatus}
+          />
+        </div>
+
+        {/* Service Filter */}
+        {allServices.length > 0 && (
+          <div className="mb-8">
+            <ServiceFilter 
+              services={allServices}
+              selectedService={selectedService}
+              onServiceSelect={setSelectedService}
+              clientCounts={serviceCounts}
+            />
+          </div>
+        )}
+
         {/* Current Client Being Served */}
         {cuttingClient && cuttingClient.cuttingStartTime && (
           <div className="mb-8">
@@ -293,22 +346,36 @@ const Index = () => {
           />
         )}
 
-        {/* Layout com duas colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Layout com três colunas */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Queue */}
-          <div>
+          <div className="lg:col-span-2">
             <ClientQueue 
-              clients={waitingClients}
+              clients={filteredWaitingClients}
               onStartCutting={startCutting}
               onRemoveClient={removeClient}
               hasCuttingClient={!!cuttingClient}
               currentCuttingDuration={cuttingDuration}
               isPaused={isPaused}
             />
+            
+            {selectedService && filteredWaitingClients.length === 0 && (
+              <div className="mt-4 text-center text-gray-500">
+                <p>Nenhum cliente na fila para o serviço "{selectedService}"</p>
+              </div>
+            )}
           </div>
 
-          {/* History */}
-          <div>
+          {/* Right Sidebar */}
+          <div className="space-y-6">
+            {/* Export Report */}
+            <ExportReport 
+              waitingClients={waitingClients}
+              completedClients={completedClients}
+              currentClient={cuttingClient}
+            />
+            
+            {/* History */}
             <CompletedClientsHistory completedClients={completedClients} />
           </div>
         </div>
