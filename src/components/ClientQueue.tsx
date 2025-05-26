@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Scissors, X, Users } from 'lucide-react';
+import { Clock, Scissors, X, Users, Timer } from 'lucide-react';
 import type { Client } from '@/pages/Index';
 
 interface ClientQueueProps {
@@ -11,18 +11,53 @@ interface ClientQueueProps {
   onStartCutting: (clientId: string) => void;
   onRemoveClient: (clientId: string) => void;
   hasCuttingClient: boolean;
+  currentCuttingDuration?: number;
+  isPaused: boolean;
 }
 
 const ClientQueue: React.FC<ClientQueueProps> = ({ 
   clients, 
   onStartCutting, 
   onRemoveClient, 
-  hasCuttingClient 
+  hasCuttingClient,
+  currentCuttingDuration = 0,
+  isPaused
 }) => {
   const getWaitingTime = (arrivalTime: Date) => {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - arrivalTime.getTime()) / (1000 * 60));
     return diffInMinutes;
+  };
+
+  const getEstimatedWaitTime = (index: number, currentCuttingDuration: number) => {
+    if (isPaused) return "Pausado";
+    
+    let totalWaitTime = 0;
+    
+    // Se há alguém cortando, adicionar o tempo restante estimado
+    if (hasCuttingClient && index === 0) {
+      const currentClient = clients[0];
+      const estimatedRemaining = Math.max(0, (currentClient?.estimatedDuration || 30) - Math.floor(currentCuttingDuration / 60));
+      totalWaitTime = estimatedRemaining;
+    } else if (hasCuttingClient) {
+      // Tempo restante do corte atual
+      const currentClient = clients[0];
+      const estimatedRemaining = Math.max(0, (currentClient?.estimatedDuration || 30) - Math.floor(currentCuttingDuration / 60));
+      totalWaitTime = estimatedRemaining;
+      
+      // Somar tempos dos clientes à frente na fila
+      for (let i = 0; i < index; i++) {
+        totalWaitTime += clients[i].estimatedDuration;
+      }
+    } else {
+      // Somar tempos dos clientes à frente na fila
+      for (let i = 0; i < index; i++) {
+        totalWaitTime += clients[i].estimatedDuration;
+      }
+    }
+    
+    if (totalWaitTime < 5) return "Em breve";
+    return `~${totalWaitTime}min`;
   };
 
   const getPositionMessage = (index: number) => {
@@ -55,7 +90,7 @@ const ClientQueue: React.FC<ClientQueueProps> = ({
           key={client.id} 
           className={`bg-white/90 backdrop-blur-sm transition-all duration-200 hover:shadow-lg ${
             index === 0 ? 'ring-2 ring-amber-300 border-amber-200' : ''
-          }`}
+          } ${isPaused ? 'opacity-75' : ''}`}
         >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -79,6 +114,10 @@ const ClientQueue: React.FC<ClientQueueProps> = ({
                     <Clock className="w-4 h-4" />
                     {client.estimatedDuration}min
                   </span>
+                  <span className="flex items-center gap-1">
+                    <Timer className="w-4 h-4" />
+                    Espera: {getEstimatedWaitTime(index, currentCuttingDuration)}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -86,13 +125,13 @@ const ClientQueue: React.FC<ClientQueueProps> = ({
                     Chegada: {client.arrivalTime.toLocaleTimeString('pt-BR')}
                   </span>
                   <span>
-                    Esperando: {getWaitingTime(client.arrivalTime)}min
+                    Na fila há: {getWaitingTime(client.arrivalTime)}min
                   </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 ml-4">
-                {index === 0 && !hasCuttingClient && (
+                {index === 0 && !hasCuttingClient && !isPaused && (
                   <Button 
                     onClick={() => onStartCutting(client.id)}
                     className="bg-green-600 hover:bg-green-700 text-white"
